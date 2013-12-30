@@ -1,4 +1,4 @@
-#!/usr/bin/env
+#!/usr/bin/env python
 
 '''
 Do I care to document anything? Maybe later...
@@ -14,12 +14,14 @@ from twisted.conch.ssh import factory, userauth, connection, keys, session
 from twisted.conch import recvline, error, avatar, interfaces
 
 import os, rsa
+from sys import stdout
 from zope.interface import implements
 
 from util import columnize
 from filesystem import fs as filesystem
 
-log.startLogging(open('kurth.log', 'w'))
+log.startLogging(stdout)
+log.addObserver(log.FileLogObserver(file("kurth.log", 'w')).emit)
 
 class KurthProtocol(recvline.HistoricRecvLine):
     def __init__(self, user):
@@ -36,9 +38,9 @@ class KurthProtocol(recvline.HistoricRecvLine):
                          'ls': self.ls,
                          'cd': self.cd,
                          'w': self.w}
-        tmppath = os.path.dirname(os.path.realpath(__file__)) + \
+        fs_file = os.path.dirname(os.path.realpath(__file__)) + \
                                   '/filesystem/fs.gz'
-        self.fs = filesystem.FS_Walker(tmppath)
+        self.fs = filesystem.FS_Walker(fs_file)
 
     def connectionMade(self):
         recvline.HistoricRecvLine.connectionMade(self)
@@ -126,14 +128,8 @@ class KurthProtocol(recvline.HistoricRecvLine):
         pass
 
     def ls(self, args):
-        data = ''
-        try:
-            data = ' '.join(self.fs.ls(args))
-        except TypeError:
-            pass
-
+        data = self.fs.ls(args)
         self.output_columned(data)
-        self.terminal.nextLine()
 
     def pwd(self, *_):
         self.output(self.fs.pwd())
@@ -188,6 +184,9 @@ class KurthAvatar(avatar.ConchUser):
 
     def execCommand(self, protocol, cmd):
         raise NotImplementedError
+
+    def eofReceived(self):
+        pass
 
     def windowChanged(self, winSize):
         pass

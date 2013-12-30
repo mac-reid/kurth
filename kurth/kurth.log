@@ -1,7 +1,0 @@
-2013-12-26 12:02:58-0600 [-] Log opened.
-2013-12-26 12:02:58-0600 [-] SSHFactory starting on 2022
-2013-12-26 12:02:58-0600 [-] Starting factory <twisted.conch.ssh.factory.SSHFactory instance at 0x2ee1200>
-2013-12-26 12:03:03-0600 [-] Received SIGINT, shutting down.
-2013-12-26 12:03:03-0600 [twisted.conch.ssh.factory.SSHFactory] (TCP Port 2022 Closed)
-2013-12-26 12:03:03-0600 [twisted.conch.ssh.factory.SSHFactory] Stopping factory <twisted.conch.ssh.factory.SSHFactory instance at 0x2ee1200>
-2013-12-26 12:03:03-0600 [-] Main loop terminated.

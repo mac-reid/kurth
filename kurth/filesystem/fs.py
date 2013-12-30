@@ -29,8 +29,9 @@ class FS_Walker:
     def ls(self, args=None):
         data = self.filesystem.get(self.current_path, {'files': [],'dirs': []})
         if not args:
+            data = data['files'] + data['dirs']
             data = [x for x in data if not x.startswith('.')]
-        return sorted(data['files'] + data['dirs'])
+        return sorted(data)
 
     def __open_fs_pickle(self, pickle):
         try:
