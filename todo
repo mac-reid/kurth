@@ -1,0 +1,35 @@
+todo
+
+1. suck less
+
+
+2. write a build process that, on save does:
+
+  if we save kurth.py
+
+    kills the currently running kurth server, if one exists
+        - run the kk function in the .zshrc file
+    run a new server with a terminal connected
+        - need a test server that can operate locally
+
+    otherwise just save file and continue on
+
+
+3. write bash.py, which will operate as the shell. This will take in each line
+   received from the server and parse it. Needs to handle pipes, redirects,
+   commands, and forking.
+
+
+4. write the rest of the commands that the shell, bash.py, can use.
+
+
+5. write a server that a remote client (or web or cli) can connect to
+
+
+6. write a front end that a client can run
+
+
+7. write other types of honeypots - ftp, smtp, telnet, and anything else
+
+
+8. document?
