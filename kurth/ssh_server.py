@@ -13,15 +13,28 @@ from twisted.cred import portal, checkers, credentials
 from twisted.conch.ssh import factory, userauth, connection, keys, session
 from twisted.conch import recvline, error, avatar, interfaces
 
-import os, rsa
 from sys import stdout
+import os, rsa, sys, traceback
 from zope.interface import implements
 
-from util import columnize
+from core import bash
 from filesystem import fs as filesystem
 
-log.startLogging(stdout)
-log.addObserver(log.FileLogObserver(file("kurth.log", 'w')).emit)
+log.startLogging(file('kurth.log', 'w'))
+log.addObserver(log.FileLogObserver(stdout).emit)
+
+class Output:
+    def __init__(self, terminal):
+        self.terminal = terminal
+
+    def log(self, text):
+        global log
+        log.msg(text)
+
+    def write(self, text):
+        self.log(text)
+        self.terminal.write(text)
+
 
 class KurthProtocol(recvline.HistoricRecvLine):
     def __init__(self, user):
@@ -29,129 +42,49 @@ class KurthProtocol(recvline.HistoricRecvLine):
         self.hostname = 'localhost'
         end = '#' if user == 'root' else '$'
         self.prompt = '[%s@%s]%s ' % (self.user.username, self.hostname, end)
-        self.commands = {'whoami': self.whoami,
-                         'clear': self.clear,
-                         'echo': self.echo,
-                         'exit': self.exit,
-                         'pwd': self.pwd,
-                         'who': self.who,
-                         'ls': self.ls,
-                         'cd': self.cd,
-                         'w': self.w}
         fs_file = os.path.dirname(os.path.realpath(__file__)) + \
-                                  '/filesystem/fs.gz'
+                                                            '/filesystem/fs.gz'
         self.fs = filesystem.FS_Walker(fs_file)
 
     def connectionMade(self):
         recvline.HistoricRecvLine.connectionMade(self)
+
+        # This took far too long to figure out
+        self.remote_ip = self.terminal.transport.getPeer().address.host
+
+        self.output = Output(self.terminal)
+        sys.stdout = self.output
+        self.shell = bash.Shell(self.fs, self.user.username, self.remote_ip,
+                                self.terminal)
         self.terminal.reset()
         self.show_prompt()
+        self.keyHandlers.update(dict.fromkeys(['\x0B', '\x0C', '\x0E',
+            '\x0F', '\x01', '\x02', '\x05', '\x06', '\x07', '\x08', '\x10',
+            '\x11', '\x12', '\x13', '\x14', '\x16', '\x17', '\x18', '\x19'],
+            self.ignore))
         self.keyHandlers.update({
             '\x09':     self.handle_TAB,
             '\x03':     self.handle_CTRL_C,
             '\x04':     self.handle_CTRL_D,
-            '\x15':     self.handle_CTRL_U
+            '\x15':     self.handle_CTRL_U,
+            '\x1A':     self.handle_CTRL_Z
             })
 
-    def terminalSize(self, width, height):
-        self.width = width
-        self.height = height
-
     def lineReceived(self, line):
-        self.log(self.prompt + line)
+        # don't waste log space if the user hits enter with nothing typed
         if line:
-            cmd_split = line.split()
-            command = cmd_split[0]
-            args = cmd_split[1:]
+            self.output.log(line)
+
+            # log any rampant exception and make sure we still print a prompt -
+            # don't want to risk losing that deep User Experience(TM) </joke>
             try:
-                self.commands[command](args)
-            except KeyError:
-                self.output(command + ': command not found')
-                self.terminal.nextLine()
+                self.shell.line_in(line)
+            except Exception:
+                self.output.log(traceback.format_exc())
         self.show_prompt()
 
     def show_prompt(self):
         self.terminal.write(self.prompt)
-
-    def log(self, text):
-        global log
-        log.msg(text)
-
-    def output(self, text):
-        self.log(text)
-        self.terminal.write(text)
-
-    # def output_greedy(self, words):
-    #     '''
-    #     We want to keep the number of log calls down as to save time writing
-    #     the log file. We only want one output called per each command called.
-    #     '''
-
-    #     current_length = 0
-    #     for word, index in enumerate(words):
-    #         current_length += len(word)
-    #         if current_length < self.width:
-    #             words.insert(index, '\n')
-    #             current_length = 0
-    #     out = ' '.join(words)
-    #     self.output(out)
-
-    #     return ''
-
-    def output_columned(self, words):
-        self.output(columnize.columnize(words))
-
-##### start commands ##########################################################
-
-    def cat(self, args):
-        for arg in args:
-            self.output(self.fs.read(arg))
-            self.terminal.nextLine()
-
-    def cd(self, args):
-        ret = self.fs.cd(args)
-        if ret:
-            self.output(ret)
-            self.terminal.nextLine()
-
-    def clear(self, *_):
-        self.terminal.reset()
-
-    def echo(self, args):
-        self.output(' '.join(args))
-        self.terminal.nextLine()
-
-    def exit(self, *_):
-        self.terminal.loseConnection()
-
-    def grep(self, args):
-        pass
-
-    def ls(self, args):
-        data = self.fs.ls(args)
-        self.output_columned(data)
-
-    def pwd(self, *_):
-        self.output(self.fs.pwd())
-
-    def sed(self, args):
-        pass
-
-    def w(self, args):
-        if self.width <= 70:
-            self.output('w: %i column window is too narrow' % self.width)
-
-    def who(self, args):
-        template = '%(name)s   %(line)s          %(time)s %(comment)s'
-        self.output(template % {'name': self.user.username, 'line': 'pts/7',
-                    'time': '2013-12-25 00:00', 'comment': '(:0)'})
-        self.terminal.nextLine()
-
-    def whoami(self, args):
-        self.output(self.user.username)
-        self.terminal.nextLine()
-
-##### start handlers ##########################################################
 
     def handle_CTRL_C(self):
         self.terminal.nextLine()
@@ -161,9 +94,19 @@ class KurthProtocol(recvline.HistoricRecvLine):
         self.terminal.loseConnection()
 
     def handle_CTRL_U(self):
+        self.terminal.deleteLine()
+        self.terminal.cursorBackward(len(self.prompt) + self.lineBufferIndex)
         self.terminal.write(self.prompt)
+        self.lineBuffer = []
+        self.lineBufferIndex = 0
+
+    def handle_CTRL_Z(self):
+        pass
 
     def handle_TAB(self):
+        pass
+
+    def ignore(self):
         pass
 
 class KurthAvatar(avatar.ConchUser):
@@ -172,7 +115,7 @@ class KurthAvatar(avatar.ConchUser):
     def __init__(self, username):
         avatar.ConchUser.__init__(self)
         self.username = username
-        self.channelLookup.update({'session':session.SSHSession})
+        self.channelLookup['session'] = session.SSHSession
 
     def openShell(self, protocol):
         server = insults.ServerProtocol(KurthProtocol, self)
@@ -182,13 +125,10 @@ class KurthAvatar(avatar.ConchUser):
     def getPty(self, terminal, windowSize, attrs):
         return None
 
-    def execCommand(self, protocol, cmd):
-        raise NotImplementedError
-
-    def eofReceived(self):
+    def windowChanged(self, size):
         pass
 
-    def windowChanged(self, winSize):
+    def eofReceived(self):
         pass
 
     def closed(self):
@@ -208,7 +148,7 @@ class KurthRealm:
 def generateRSAKeys():
     if not (os.path.isfile('keys/public.key') and
             os.path.isfile('keys/private.key')):
-        print "Generating RSA keypair..."
+        print 'Generating RSA keypair...'
         from Crypto import Random
         from Crypto.PublicKey import RSA
         KEY_LENGTH = 1024
@@ -216,9 +156,9 @@ def generateRSAKeys():
         rsaKey = RSA.generate(KEY_LENGTH, random_generator)
         privateKey = rsaKey.exportKey()
         publicKey = rsaKey.publickey().exportKey(format='OpenSSH')
-        file('keys/public.key', 'w+b').write(publicKey)
-        file('keys/private.key', 'w+b').write(privateKey)
-        print "done."
+        file('keys/public.key', 'wb').write(publicKey)
+        file('keys/private.key', 'wb').write(privateKey)
+        print 'done.'
 
 if __name__ == '__main__':
     sshFactory = factory.SSHFactory()
