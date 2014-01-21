@@ -76,7 +76,7 @@ class KurthProtocol(recvline.HistoricRecvLine):
             self.output.log(line)
 
             # log any rampant exception and make sure we still print a prompt -
-            # don't want to risk losing that deep User Experience(TM) </joke>
+            # don't want to risk losing that deep User Experience(TM) /joke
             try:
                 self.shell.line_in(line)
             except Exception:

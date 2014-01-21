@@ -24,5 +24,5 @@ class FS_Walker:
             print >> sys.stderr, 'Fatal: ' + pickle + ' not found.'
             sys.exit(1)
 
-    def read(filename):
+    def read(self, filename):
         pass
