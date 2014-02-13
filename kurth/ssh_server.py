@@ -124,8 +124,8 @@ class KurthAvatar(avatar.ConchUser):
         server.makeConnection(protocol)
         protocol.makeConnection(session.wrapProtocol(server))
 
-    def getPty(self, terminal, windowSize, attrs):
-        self.windowSize = windowSize
+    def getPty(self, terminal, window_size, attrs):
+        self.windowSize = window_size
         return None
 
     def windowChanged(self, size):
@@ -142,6 +142,7 @@ class KurthRealm:
     implements(portal.IRealm)
 
     def requestAvatar(self, avatarID, mind, *items):
+        print 'request'
         if interfaces.IConchUser in items:
             return items[0], KurthAvatar(avatarID), lambda: None
         else:
@@ -152,35 +153,22 @@ class KurthRealm:
 class KurthSSHFactory(factory.SSHFactory):
     def __init__(self):
         self.starttime = time.time()
-        self.protocol = transport.SSHServerTransport
-
-        generateRSAKeys()
-        with open('keys/public.key') as pub:
-            PUBBLOB = pub.read()
-            self.publicKeys = {'ssh-rsa': Key.fromString(data=PUBBLOB)}
-        with open('keys/private.key') as priv:
-            PRIVBLOB = priv.read()
-            self.privateKeys = {'ssh-rsa': Key.fromString(data=PRIVBLOB)}
         self.services = {'ssh-userauth': userauth.SSHUserAuthServer,
                          'ssh-connection': connection.SSHConnection}
 
+    # as implemented by Kojoney
     def buildProtocol(self, addr):
         trans = transport.SSHServerTransport()
-        trans.ourVersionString = 'OpenSSH 5.3 (protocol 2.0)'
+        trans.ourVersionString = 'SSH-2.0-OpenSSH_5.3p1'
         trans.supportedPublicKeys = self.privateKeys.keys()
-        #self.protocol = transport.SSHServerTransport
 
-        # as implemented by Kojoney
         if not self.primes:
             ske = trans.supportedKeyExchanges[:]
             ske.remove('diffie-hellman-group-exchange-sha1')
             trans.supportedKeyExchanges = ske
         trans.factory = self
+        self.protocol = trans
         return trans
-
-    def getService(self, transport, service):
-         if service == 'ssh-userauth' or hasattr(transport, 'avatar'):
-             return self.services[service]
 
 
 def generateRSAKeys():
@@ -199,8 +187,8 @@ def generateRSAKeys():
         print 'done.'
 
 if __name__ == '__main__':
-    # sshFactory = KurthSSHFactory()
-    sshFactory = factory.SSHFactory()
+    sshFactory = KurthSSHFactory()
+    # sshFactory = factory.SSHFactory()
 
     sshFactory.portal = portal.Portal(KurthRealm())
     users = {'user': 'user', 'root': 'root'}
@@ -214,8 +202,6 @@ if __name__ == '__main__':
     with open('keys/private.key') as priv:
         PRIVBLOB = priv.read()
         sshFactory.privateKeys = {'ssh-rsa': Key.fromString(data=PRIVBLOB)}
-    sshFactory.services = {'ssh-userauth': userauth.SSHUserAuthServer,
-                     'ssh-connection': connection.SSHConnection}
 
     reactor.listenTCP(2022, sshFactory)
     reactor.run()
