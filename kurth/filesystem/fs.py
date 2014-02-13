@@ -7,7 +7,9 @@ class FS_Walker:
 
     filesystem = {}
 
-    def __init__(self, path):
+    def __init__(self):
+        # hard coded for now
+        path = 'filesystem/fs.gz'
         self.__open_fs_pickle(path)
 
     def check_dir_in_filesystem(self, directory):

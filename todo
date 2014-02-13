@@ -2,18 +2,7 @@ todo
 
 1. suck less
 
-
-2. write a build process that, on save does:
-
-  if we save kurth.py
-
-    kills the currently running kurth server, if one exists
-        - run the kk function in the .zshrc file
-    run a new server with a terminal connected
-        - need a test server that can operate locally
-
-    otherwise just save file and continue on
-
+2. use a configuration file for settings
 
 3. write bash.py, which will operate as the shell. This will take in each line
    received from the server and parse it. Needs to handle pipes, redirects,

@@ -8,13 +8,15 @@ from twisted.python import log
 from twisted.internet import reactor
 from twisted.conch.ssh.keys import Key
 from twisted.conch.insults import insults
-from twisted.application import service, internet
-from twisted.cred import portal, checkers, credentials
-from twisted.conch.ssh import factory, userauth, connection, keys, session
-from twisted.conch import recvline, error, avatar, interfaces
+from twisted.cred import portal, checkers
+from twisted.conch.ssh import connection, factory, session, transport, userauth
+from twisted.conch import recvline, avatar, interfaces
 
+import os
+import sys
+import time
+import traceback
 from sys import stdout
-import os, rsa, sys, traceback
 from zope.interface import implements
 
 from core import bash
@@ -22,6 +24,7 @@ from filesystem import fs as filesystem
 
 log.startLogging(file('kurth.log', 'w'))
 log.addObserver(log.FileLogObserver(stdout).emit)
+
 
 class Output:
     def __init__(self, terminal):
@@ -42,9 +45,7 @@ class KurthProtocol(recvline.HistoricRecvLine):
         self.hostname = 'localhost'
         end = '#' if user == 'root' else '$'
         self.prompt = '[%s@%s]%s ' % (self.user.username, self.hostname, end)
-        fs_file = os.path.dirname(os.path.realpath(__file__)) + \
-                                                            '/filesystem/fs.gz'
-        self.fs = filesystem.FS_Walker(fs_file)
+        self.fs = filesystem.FS_Walker()
 
     def connectionMade(self):
         recvline.HistoricRecvLine.connectionMade(self)
@@ -63,11 +64,11 @@ class KurthProtocol(recvline.HistoricRecvLine):
             '\x11', '\x12', '\x13', '\x14', '\x16', '\x17', '\x18', '\x19'],
             self.ignore))
         self.keyHandlers.update({
-            '\x09':     self.handle_TAB,
-            '\x03':     self.handle_CTRL_C,
-            '\x04':     self.handle_CTRL_D,
-            '\x15':     self.handle_CTRL_U,
-            '\x1A':     self.handle_CTRL_Z
+            '\x09':     self.handle_tab,
+            '\x03':     self.handle_ctrl_c,
+            '\x04':     self.handle_ctrl_d,
+            '\x15':     self.handle_ctrl_u,
+            '\x1A':     self.handle_ctrl_z
             })
 
     def lineReceived(self, line):
@@ -86,28 +87,29 @@ class KurthProtocol(recvline.HistoricRecvLine):
     def show_prompt(self):
         self.terminal.write(self.prompt)
 
-    def handle_CTRL_C(self):
+    def handle_ctrl_c(self):
         self.terminal.nextLine()
         self.show_prompt()
 
-    def handle_CTRL_D(self):
+    def handle_ctrl_d(self):
         self.terminal.loseConnection()
 
-    def handle_CTRL_U(self):
+    def handle_ctrl_u(self):
         self.terminal.deleteLine()
         self.terminal.cursorBackward(len(self.prompt) + self.lineBufferIndex)
         self.terminal.write(self.prompt)
         self.lineBuffer = []
         self.lineBufferIndex = 0
 
-    def handle_CTRL_Z(self):
+    def handle_ctrl_z(self):
         pass
 
-    def handle_TAB(self):
+    def handle_tab(self):
         pass
 
     def ignore(self):
         pass
+
 
 class KurthAvatar(avatar.ConchUser):
     implements(interfaces.ISession)
@@ -123,16 +125,18 @@ class KurthAvatar(avatar.ConchUser):
         protocol.makeConnection(session.wrapProtocol(server))
 
     def getPty(self, terminal, windowSize, attrs):
+        self.windowSize = windowSize
         return None
 
     def windowChanged(self, size):
-        pass
+        self.windowSize = size
 
     def eofReceived(self):
         pass
 
     def closed(self):
         pass
+
 
 class KurthRealm:
     implements(portal.IRealm)
@@ -143,7 +147,41 @@ class KurthRealm:
         else:
             log.msg('No supported interfaces found')
             log.err()
-            pass
+
+
+class KurthSSHFactory(factory.SSHFactory):
+    def __init__(self):
+        self.starttime = time.time()
+        self.protocol = transport.SSHServerTransport
+
+        generateRSAKeys()
+        with open('keys/public.key') as pub:
+            PUBBLOB = pub.read()
+            self.publicKeys = {'ssh-rsa': Key.fromString(data=PUBBLOB)}
+        with open('keys/private.key') as priv:
+            PRIVBLOB = priv.read()
+            self.privateKeys = {'ssh-rsa': Key.fromString(data=PRIVBLOB)}
+        self.services = {'ssh-userauth': userauth.SSHUserAuthServer,
+                         'ssh-connection': connection.SSHConnection}
+
+    def buildProtocol(self, addr):
+        trans = transport.SSHServerTransport()
+        trans.ourVersionString = 'OpenSSH 5.3 (protocol 2.0)'
+        trans.supportedPublicKeys = self.privateKeys.keys()
+        #self.protocol = transport.SSHServerTransport
+
+        # as implemented by Kojoney
+        if not self.primes:
+            ske = trans.supportedKeyExchanges[:]
+            ske.remove('diffie-hellman-group-exchange-sha1')
+            trans.supportedKeyExchanges = ske
+        trans.factory = self
+        return trans
+
+    def getService(self, transport, service):
+         if service == 'ssh-userauth' or hasattr(transport, 'avatar'):
+             return self.services[service]
+
 
 def generateRSAKeys():
     if not (os.path.isfile('keys/public.key') and
@@ -151,29 +189,33 @@ def generateRSAKeys():
         print 'Generating RSA keypair...'
         from Crypto import Random
         from Crypto.PublicKey import RSA
-        KEY_LENGTH = 1024
+        key_length = 1024
         random_generator = Random.new().read
-        rsaKey = RSA.generate(KEY_LENGTH, random_generator)
-        privateKey = rsaKey.exportKey()
-        publicKey = rsaKey.publickey().exportKey(format='OpenSSH')
-        file('keys/public.key', 'wb').write(publicKey)
-        file('keys/private.key', 'wb').write(privateKey)
+        rsa_key = RSA.generate(key_length, random_generator)
+        private_key = rsa_key.exportKey()
+        public_key = rsa_key.publickey().exportKey(format='OpenSSH')
+        file('keys/public.key', 'wb').write(public_key)
+        file('keys/private.key', 'wb').write(private_key)
         print 'done.'
 
 if __name__ == '__main__':
+    # sshFactory = KurthSSHFactory()
     sshFactory = factory.SSHFactory()
+
     sshFactory.portal = portal.Portal(KurthRealm())
     users = {'user': 'user', 'root': 'root'}
     sshFactory.portal.registerChecker(
-                    checkers.InMemoryUsernamePasswordDatabaseDontUse(**users))
+        checkers.InMemoryUsernamePasswordDatabaseDontUse(**users))
 
     generateRSAKeys()
-    with open('keys/public.key', 'r+b') as pub:
-        pubblob = pub.read()
-        sshFactory.publicKeys = {'ssh-rsa': Key.fromString(data=pubblob)}
-    with open('keys/private.key', 'r+b') as priv:
-        privblob = priv.read()
-        sshFactory.privateKeys = {'ssh-rsa': Key.fromString(data=privblob)}
+    with open('keys/public.key') as pub:
+        PUBBLOB = pub.read()
+        sshFactory.publicKeys = {'ssh-rsa': Key.fromString(data=PUBBLOB)}
+    with open('keys/private.key') as priv:
+        PRIVBLOB = priv.read()
+        sshFactory.privateKeys = {'ssh-rsa': Key.fromString(data=PRIVBLOB)}
+    sshFactory.services = {'ssh-userauth': userauth.SSHUserAuthServer,
+                     'ssh-connection': connection.SSHConnection}
 
     reactor.listenTCP(2022, sshFactory)
     reactor.run()
