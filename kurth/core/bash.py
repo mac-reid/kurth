@@ -38,7 +38,7 @@ class Shell(object):
         if command == 'cd':
             self.cd(split[1:])
         elif command:
-            #try:
+            try:
                 exitcode = self.call_function(command, split[1:])
-            #except AttributeError:
-             #   self.terminal_write('bash: %s: not found' % command)
+            except AttributeError:
+               self.terminal.write('bash: %s: not found\n' % command)
