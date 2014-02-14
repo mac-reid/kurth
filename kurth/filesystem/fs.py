@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 
-import re, sys, zlib, itertools, cPickle
+import sys
+import zlib
+import cPickle
 
-class FS_Walker:
-    'fs = filesystem'
 
+class fs:
     filesystem = {}
 
     def __init__(self):
@@ -16,7 +17,7 @@ class FS_Walker:
         return directory in self.filesystem
 
     def get_contents_of_dir(self, directory):
-        return self.filesystem.get(directory, {'files': [],'dirs': []})
+        return self.filesystem.get(directory, {'files': [], 'dirs': []})
 
     def __open_fs_pickle(self, pickle):
         try:

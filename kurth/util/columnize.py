@@ -47,7 +47,7 @@ def get_option(key, options):
         return default_opts.get(key)
     else:
         return options[key]
-    return None # Not reached
+    return None  # Not reached
 
 
 def columnize(array, displaywidth=80, colsep = '  ',
@@ -130,7 +130,7 @@ def columnize(array, displaywidth=80, colsep = '  ',
         array_index = lambda nrows, row, col: nrows*col + row
         # Try every row count from 1 upwards
         for nrows in range(1, size):
-            ncols = (size+nrows-1) // nrows
+            ncols = (size + nrows - 1) // nrows
             colwidths = []
             totwidth = -len(o['colsep'])
             for col in range(ncols):
@@ -183,7 +183,7 @@ def columnize(array, displaywidth=80, colsep = '  ',
         colwidths = []
         for ncols in range(size, 0, -1):
             # Try every row count from 1 upwards
-            min_rows = (size+ncols-1) // ncols
+            min_rows = (size + ncols - 1) // ncols
             for nrows in range(min_rows, size):
                 rounded_size = nrows * ncols
                 colwidths = []
@@ -191,7 +191,7 @@ def columnize(array, displaywidth=80, colsep = '  ',
                 for col in range(ncols):
                     # get max column width for this column
                     colwidth  = 0
-                    for row in range(1, nrows+1):
+                    for row in range(1, nrows + 1):
                         i = array_index(ncols, row, col)
                         if i >= rounded_size: break
                         elif i < size:
@@ -204,7 +204,7 @@ def columnize(array, displaywidth=80, colsep = '  ',
                     if totwidth >= o['displaywidth']:
                         break
                     pass
-                if totwidth <= o['displaywidth'] and i >= rounded_size-1:
+                if totwidth <= o['displaywidth'] and i >= rounded_size - 1:
                     # Found the right nrows and ncols
                     nrows  = row
                     break
@@ -212,7 +212,7 @@ def columnize(array, displaywidth=80, colsep = '  ',
                     # Need to reduce ncols
                     break
                 pass
-            if totwidth <= o['displaywidth'] and i >= rounded_size-1:
+            if totwidth <= o['displaywidth'] and i >= rounded_size - 1:
                 break
             pass
         # The smallest number of rows computed and the
@@ -225,7 +225,7 @@ def columnize(array, displaywidth=80, colsep = '  ',
         else:
             prefix = o['lineprefix']
             pass
-        for row in range(1, nrows+1):
+        for row in range(1, nrows + 1):
             texts = []
             for col in range(ncols):
                 i = array_index(ncols, row, col)

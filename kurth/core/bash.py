@@ -2,6 +2,7 @@
 
 from commands import shortcommands
 
+
 class Shell(object):
 
     env = {'PWD': '/', 'OLDPWD': '/', '?': 0, '0': 'bash'}
@@ -41,4 +42,5 @@ class Shell(object):
             try:
                 exitcode = self.call_function(command, split[1:])
             except AttributeError:
-               self.terminal.write('bash: %s: not found\n' % command)
+                self.terminal.write('bash: %s: not found\n' % command)
+        self.env['?'] = exitcode

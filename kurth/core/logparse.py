@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
-import re, sys
+import re
+import sys
 
 
 def _add_to_dict(dictionary, data):

@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
-import os, zlib, cPickle
+import os
+import zlib
+import cPickle
 
 
 def walk_dir(path):
@@ -8,6 +10,7 @@ def walk_dir(path):
     for dirpath, subdirs, files in os.walk(path):
         subdir[dirpath] = {'dirs': subdirs, 'files': files}
     return subdir
+
 
 def do_stuff():
     filesystem = {}
@@ -23,3 +26,4 @@ def do_stuff():
         out.write(zlib.compress(cPickle.dumps(filesystem)))
         # cPickle.dump(filesystem, out)
     stuff = raw_input('type: ')
+    print stuff

@@ -31,7 +31,6 @@ class Output:
         self.terminal = terminal
 
     def log(self, text):
-        global log
         log.msg(text)
 
     def write(self, text):
@@ -45,7 +44,7 @@ class KurthProtocol(recvline.HistoricRecvLine):
         self.hostname = 'localhost'
         end = '#' if user == 'root' else '$'
         self.prompt = '[%s@%s]%s ' % (self.user.username, self.hostname, end)
-        self.fs = filesystem.FS_Walker()
+        self.fs = filesystem.fs()
 
     def connectionMade(self):
         recvline.HistoricRecvLine.connectionMade(self)
@@ -117,6 +116,8 @@ class KurthAvatar(avatar.ConchUser):
     def __init__(self, username):
         avatar.ConchUser.__init__(self)
         self.username = username
+        # the logged error 'unhandled request for env'
+        # comes from a missing function in session.SSHSession
         self.channelLookup['session'] = session.SSHSession
 
     def openShell(self, protocol):
@@ -159,8 +160,8 @@ class KurthSSHFactory(factory.SSHFactory):
     # as implemented by Kojoney
     def buildProtocol(self, addr):
         trans = transport.SSHServerTransport()
-        trans.ourVersionString = 'SSH-2.0-OpenSSH_5.3p1'
         trans.supportedPublicKeys = self.privateKeys.keys()
+        trans.ourVersionString = 'SSH-2.0-OpenSSH_5.3 Debian-5ubuntu1.1'
 
         if not self.primes:
             ske = trans.supportedKeyExchanges[:]
@@ -188,7 +189,6 @@ def generateRSAKeys():
 
 if __name__ == '__main__':
     sshFactory = KurthSSHFactory()
-    # sshFactory = factory.SSHFactory()
 
     sshFactory.portal = portal.Portal(KurthRealm())
     users = {'user': 'user', 'root': 'root'}

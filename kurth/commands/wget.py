@@ -1,16 +1,22 @@
-import re, sys, time, socket, urllib2
+import re
+import sys
+import time
+import socket
+import urllib2
 
-# Thanks to @Markus Jarderot on Stack Overflow
-# http://stackoverflow.com/a/319293
-def is_valid_ip(ip):
-    """Validates IP addresses.
+
+def is_valid_ip(addr):
     """
-    return is_valid_ipv4(ip) or is_valid_ipv6(ip)
+    Thanks to @Markus Jarderot on Stack Overflow
+    http://stackoverflow.com/a/319293
+    """
+    return is_valid_ipv4(addr) or is_valid_ipv6(addr)
 
-# Thanks to @Markus Jarderot on Stack Overflow
-# http://stackoverflow.com/a/319293
-def is_valid_ipv4(ip):
-    """Validates IPv4 addresses.
+
+def is_valid_ipv4(addr):
+    """
+    Thanks to @Markus Jarderot on Stack Overflow
+    http://stackoverflow.com/a/319293
     """
     pattern = re.compile(r"""
         ^
@@ -46,12 +52,13 @@ def is_valid_ipv4(ip):
         )
         $
     """, re.VERBOSE | re.IGNORECASE)
-    return pattern.match(ip) is not None
+    return pattern.match(addr) is not None
 
-# Thanks to @Markus Jarderot on Stack Overflow
-# http://stackoverflow.com/a/319293
-def is_valid_ipv6(ip):
-    """Validates IPv6 addresses.
+
+def is_valid_ipv6(addr):
+    """
+    Thanks to @Markus Jarderot on Stack Overflow
+    http://stackoverflow.com/a/319293
     """
     pattern = re.compile(r"""
         ^
@@ -79,13 +86,15 @@ def is_valid_ipv6(ip):
         \s*                         # Trailing whitespace
         $
     """, re.VERBOSE | re.IGNORECASE | re.DOTALL)
-    return pattern.match(ip) is not None
+    return pattern.match(addr) is not None
+
 
 def ip_is_resolvable(ip_addr):
     try:
         return socket.gethostbyaddr(ip_addr)
     except (socket.herror, socket.gaierror):
         return None
+
 
 def chunk_report(bytes_so_far, chunk_size, total_size):
     percent = float(bytes_so_far) / total_size
@@ -95,15 +104,16 @@ def chunk_report(bytes_so_far, chunk_size, total_size):
         equals = ''
     equals += '>'
     space = ' ' * (39 - len(equals))
-    bar = '[%s%s] ' % (equals, space)
+    percentage = '[%s%s] ' % (equals, space)
     str_percent = str(int(percent * 100)) + '%'
-    text = "{:<4}{} {:,}\r".format(str_percent, bar, bytes_so_far)
+    text = "{:<4}{} {:,}\r".format(str_percent, percentage, bytes_so_far)
 
     # slick way to print text on a single line repeatedly
     print text,
 
     if bytes_so_far >= total_size:
         print '\n'
+
 
 def chunk_read(response, chunk_size=8192, report_hook=None):
     total_size = int(response.info().getheader('Content-Length').strip())
@@ -114,12 +124,13 @@ def chunk_read(response, chunk_size=8192, report_hook=None):
         bytes_so_far += len(chunk)
 
         if not chunk:
-           break
+            break
 
         if report_hook:
-           report_hook(bytes_so_far, chunk_size, total_size)
+            report_hook(bytes_so_far, chunk_size, total_size)
 
     return bytes_so_far
+
 
 def num_fmt(num):
     # ignore anything smaller than a kilobyte
@@ -127,11 +138,12 @@ def num_fmt(num):
     if num < 1024.0:
         return
 
-    for x in ['K','M','G']:
+    for x in ['K', 'M', 'G']:
         if num < 1024.0:
             return "%3.1f%s" % (num, x)
         num /= 1024.0
     return "%3.1f%s" % (num, 'T')
+
 
 def wget(args):
     url = args[0]
@@ -145,18 +157,18 @@ def wget(args):
     else:
         host = url_s + ' (%s)' % url_s
         sys.stdout.write('Resolving %s... ' % host)
-        ip = ip_is_resolvable(url_s)
-        if not ip:
+        addr = ip_is_resolvable(url_s)
+        if not addr:
             print 'failed: Name or service not known.'
             print 'wget: unable to resolve host address `%s\'' % url_s
             return
         else:
-            print ip[2][0]
-            host = host + '|%s|:80' % ip[2][0]
+            print addr[2][0]
+            host = host + '|%s|:80' % addr[2][0]
     sys.stdout.write('Connecting to %s... ' % host)
     try:
         connection = urllib2.urlopen(url)
-    except: # make this smarter
+    except:  # make this smarter
         print 'failed.'
         return
     print 'connected.'
